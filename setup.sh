@@ -8,8 +8,15 @@ if ! command -v brew >/dev/null 2>&1; then
   exit 1
 fi
 
+# Ensure brew shellenv is loaded (fixes PATH issues in scripts)
+if [[ -d "/opt/homebrew/bin" ]]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [[ -d "/usr/local/bin" ]]; then
+  eval "$(/usr/local/bin/brew shellenv)"
+fi
+
 echo "🔍 Checking if holmesgpt is installed..."
-if ! command -v holmesgpt >/dev/null 2>&1; then
+if ! brew list holmesgpt >/dev/null 2>&1; then
   echo "⬇️ Installing HolmesGPT..."
   brew update
   brew tap robusta-dev/homebrew-holmesgpt
@@ -18,11 +25,18 @@ else
   echo "✅ holmesgpt already installed"
 fi
 
-# Verify installation
+echo "🔗 Ensuring holmesgpt is linked..."
+brew link holmesgpt >/dev/null 2>&1 || true
+
+# Final verification with PATH fixed
 if ! command -v holmesgpt >/dev/null 2>&1; then
-  echo "❌ holmesgpt installation failed"
+  echo "❌ holmesgpt installed but not found in PATH"
+  echo "👉 Add this to your shell config (~/.zshrc or ~/.bashrc):"
+  echo '   eval "$(/opt/homebrew/bin/brew shellenv)"'
   exit 1
 fi
+
+echo "✅ holmesgpt available at: $(which holmesgpt)"
 
 echo "📁 Setting up configuration..."
 
@@ -31,10 +45,11 @@ CONFIG_FILE="$CONFIG_DIR/config.yaml"
 
 mkdir -p "$CONFIG_DIR"
 
-# Backup existing config if present
+# Backup existing config
 if [ -f "$CONFIG_FILE" ]; then
-  echo "📦 Backing up existing config..."
-  cp "$CONFIG_FILE" "$CONFIG_FILE.bak.$(date +%s)"
+  BACKUP_FILE="$CONFIG_FILE.bak.$(date +%s)"
+  echo "📦 Backing up existing config to $BACKUP_FILE"
+  cp "$CONFIG_FILE" "$BACKUP_FILE"
 fi
 
 echo "📝 Writing config..."
@@ -59,9 +74,16 @@ EOF
 echo "✅ Config written to $CONFIG_FILE"
 
 echo "🔍 Verifying HolmesGPT..."
-holmesgpt version || {
-  echo "❌ HolmesGPT verification failed"
-  exit 1
-}
+holmesgpt version
 
 echo "🎉 HolmesGPT setup complete!"
+
+# Optional: Kubernetes check
+if command -v kubectl >/dev/null 2>&1; then
+  echo "🔍 Checking Kubernetes access..."
+  if kubectl get nodes >/dev/null 2>&1; then
+    echo "✅ Kubernetes access OK"
+  else
+    echo "⚠️ kubectl installed but cluster not accessible"
+  fi
+fi
