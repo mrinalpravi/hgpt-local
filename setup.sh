@@ -3,40 +3,46 @@
 set -euo pipefail
 
 echo "🔍 Checking for Homebrew..."
-if ! command -v brew >/dev/null 2>&1; then
+
+BREW_BIN="$(command -v brew || true)"
+
+if [ -z "$BREW_BIN" ]; then
   echo "❌ Homebrew not found. Install from https://brew.sh/"
   exit 1
 fi
 
-# Ensure brew shellenv is loaded (fixes PATH issues in scripts)
-if [[ -d "/opt/homebrew/bin" ]]; then
-  eval "$(/opt/homebrew/bin/brew shellenv)"
-elif [[ -d "/usr/local/bin" ]]; then
-  eval "$(/usr/local/bin/brew shellenv)"
-fi
+echo "✅ Homebrew found at: $BREW_BIN"
 
-echo "🔍 Checking if holmesgpt is installed..."
+# Ensure correct PATH using brew prefix
+BREW_PREFIX="$($BREW_BIN --prefix)"
+export PATH="$BREW_PREFIX/bin:$BREW_PREFIX/sbin:$PATH"
+
+echo "🔧 Using Homebrew prefix: $BREW_PREFIX"
+
+echo "🔍 Checking if Holmes is installed..."
+
 if ! brew list holmesgpt >/dev/null 2>&1; then
   echo "⬇️ Installing HolmesGPT..."
   brew update
   brew tap robusta-dev/homebrew-holmesgpt
   brew install holmesgpt
 else
-  echo "✅ holmesgpt already installed"
+  echo "✅ Holmes already installed"
 fi
 
-echo "🔗 Ensuring holmesgpt is linked..."
+echo "🔗 Ensuring Holmes is linked..."
 brew link holmesgpt >/dev/null 2>&1 || true
 
-# Final verification with PATH fixed
-if ! command -v holmesgpt >/dev/null 2>&1; then
-  echo "❌ holmesgpt installed but not found in PATH"
-  echo "👉 Add this to your shell config (~/.zshrc or ~/.bashrc):"
-  echo '   eval "$(/opt/homebrew/bin/brew shellenv)"'
+# ✅ Correct binary check
+HOLMES_BIN="$(command -v holmes || true)"
+
+if [ -z "$HOLMES_BIN" ]; then
+  echo "❌ holmes CLI not found even after install"
+  echo "👉 Try restarting terminal or check brew doctor"
   exit 1
 fi
 
-echo "✅ holmesgpt available at: $(which holmesgpt)"
+echo "✅ holmes available at: $HOLMES_BIN"
 
 echo "📁 Setting up configuration..."
 
@@ -73,12 +79,13 @@ EOF
 
 echo "✅ Config written to $CONFIG_FILE"
 
-echo "🔍 Verifying HolmesGPT..."
-holmesgpt version
+echo "🔍 Verifying Holmes..."
 
-echo "🎉 HolmesGPT setup complete!"
+holmes version
 
-# Optional: Kubernetes check
+echo "🎉 Holmes setup complete!"
+
+# Optional Kubernetes check
 if command -v kubectl >/dev/null 2>&1; then
   echo "🔍 Checking Kubernetes access..."
   if kubectl get nodes >/dev/null 2>&1; then
